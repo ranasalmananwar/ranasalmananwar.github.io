@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ranasalmananwar.github.io/sitemap.xml
