@@ -9,17 +9,40 @@
   const $$ = (q, el = document) => [...el.querySelectorAll(q)];
   const esc = t => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-  /* ---------- headline numbers / live Scholar box ---------- */
+  /* ---------- headline numbers (data.js), then live Google Scholar data ---------- */
   if (S.metrics) $$('[data-metric]').forEach(b => { if (S.metrics[b.dataset.metric]) b.textContent = S.metrics[b.dataset.metric]; });
-  const live = (S.scholarWidgetUrl || '').trim();
-  if (live) {
-    const sep = live.includes('?') ? '&' : '?';
-    $('#scholar-stats').innerHTML = `<iframe class="scholar-frame" style="height:190px" src="${esc(live + sep)}view=stats" title="Google Scholar citation indices" loading="lazy"></iframe>`;
-    $('#metrics').style.display = 'none';
-    $('#scholar-papers').innerHTML = `<iframe class="scholar-frame" style="height:900px" src="${esc(live + sep)}view=papers" title="Google Scholar publication list" loading="lazy"></iframe>`;
-    $('#scholar-live').style.display = 'block';
-    const src = $('.src'); if (src) src.textContent = 'Live from Google Scholar, updated daily.';
+  let scholar = null;
+  const norm = t => String(t || '').toLowerCase().replace(/<[^>]+>/g, '').replace(/[^a-z0-9]+/g, '');
+  function citesFor(title) {
+    if (!scholar || !scholar.papers) return null;
+    const k = norm(title).slice(0, 60);
+    const hit = scholar.papers.find(p => { const n = norm(p.title); return n.slice(0, 60) === k || n.startsWith(k.slice(0, 45)) || k.startsWith(n.slice(0, 45)); });
+    return hit ? hit.citations : null;
   }
+  function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } }
+  async function loadScholar() {
+    const host = location.hostname, urls = [];
+    if (host.endsWith('.github.io')) urls.push(`https://raw.githubusercontent.com/${host.split('.')[0]}/${host}/main/data/scholar.json`);
+    urls.push('data/scholar.json?v=' + Date.now());
+    for (const u of urls) {
+      try {
+        const r = await fetch(u, { cache: 'no-store' });
+        if (!r.ok) continue;
+        const d = await r.json();
+        if (d && d.citations) return d;
+      } catch (e) { /* try next */ }
+    }
+    return null;
+  }
+  loadScholar().then(d => {
+    if (!d) return;
+    scholar = d;
+    const set = (k, v) => { const el = $(`[data-metric="${k}"]`); if (el && v != null) el.textContent = Number(v).toLocaleString('en-US'); };
+    set('citations', d.citations); set('hIndex', d.hIndex);
+    const src = $('#scholar-src');
+    if (src) src.textContent = `Live from Google Scholar · i10-index ${d.i10Index} · updated ${fmtDate(d.updated || d.checked)}`;
+    renderP();
+  });
 
   /* ---------- publications ---------- */
   const P = (S.publications || []).slice().sort((a, b) => b.year - a.year);
@@ -29,17 +52,20 @@
   let pf = 'all', pq = '';
   function renderP() {
     const L = P.filter(p => {
-      const f = pf === 'all' || (pf === 'A' && (p.tags || []).includes('ABDC A')) || (pf === 'first' && p.firstAuthor) ||
+      const f = pf === 'all' || pf === 'cited' || (pf === 'A' && (p.tags || []).includes('ABDC A')) || (pf === 'first' && p.firstAuthor) ||
         (pf === 'aw' && p.award) || (pf === '2026' && p.year === 2026) || (pf === '2025' && p.year === 2025) || (pf === 'older' && p.year <= 2024);
       const q = !pq || `${p.title} ${p.authors} ${p.journal}`.toLowerCase().includes(pq);
       return f && q;
     });
-    $('#pcount').textContent = `Showing ${L.length} of ${P.length} journal articles`;
+    if (pf === 'cited') L.sort((a, b) => (citesFor(b.title) || 0) - (citesFor(a.title) || 0));
+    $('#pcount').textContent = `Showing ${L.length} of ${P.length} journal articles` + (scholar ? ' · citation counts from Google Scholar' : '');
     $('#pubs').innerHTML = L.map(p => {
       const link = p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">doi.org/${esc(p.doi)} ↗</a>`
         : (p.link ? `<a href="${esc(p.link)}" target="_blank" rel="noopener">Article ↗</a>` : '');
       const tags = (p.tags || []).map(t => `<span class="${t === 'ABDC A' ? 'A' : ''}">${esc(t)}</span>`).join('');
-      return `<li><div class="yr">${esc(p.year)}</div><div><span class="t">${esc(p.title)}</span><div class="au">${bold(p.authors)}</div><div class="jr">${esc(p.journal)}</div><div class="meta">${p.award ? `<span class="aw">${esc(p.award)}</span>` : ''}${tags}${p.firstAuthor ? '<span>First author</span>' : ''}${link}</div></div></li>`;
+      const c = citesFor(p.title);
+      const cb = c ? `<span class="cites">Cited by ${c}</span>` : '';
+      return `<li><div class="yr">${esc(p.year)}</div><div><span class="t">${esc(p.title)}</span><div class="au">${bold(p.authors)}</div><div class="jr">${esc(p.journal)}</div><div class="meta">${cb}${p.award ? `<span class="aw">${esc(p.award)}</span>` : ''}${tags}${p.firstAuthor ? '<span>First author</span>' : ''}${link}</div></div></li>`;
     }).join('');
   }
   $('#pf').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; pf = b.dataset.f; $$('#pf button').forEach(x => x.classList.toggle('on', x === b)); renderP(); });
@@ -91,17 +117,50 @@
   addEventListener('hashchange', route); route();
   $('#burger').onclick = () => $('#nav').classList.toggle('open');
 
-  /* ---------- contact form (opens the visitor's email app) ---------- */
+  /* ---------- "Request a training" button scrolls to the form ---------- */
+  $$('[data-scroll]').forEach(a => a.addEventListener('click', e => {
+    const t = document.getElementById(a.dataset.scroll);
+    if (t && location.hash === a.getAttribute('href')) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth' }); }
+    else if (t) setTimeout(() => t.scrollIntoView({ behavior: 'smooth' }), 80);
+  }));
+
+  /* ---------- enquiry forms: sent straight to your inbox via FormSubmit ---------- */
   const email = S.email || 'rana.salman@nu.edu.pk';
-  $('#cform').addEventListener('submit', e => {
-    e.preventDefault();
-    const d = Object.fromEntries(new FormData(e.target));
-    const subject = `Enquiry: ${d.type} | ${d.name}`;
-    const body = `Name: ${d.name}\nEmail: ${d.email}\nInstitution: ${d.org || '-'}\nEnquiry type: ${d.type}\nFormat: ${d.format}\nPreferred dates: ${d.dates || '-'}\n\n${d.msg}`;
-    const href = `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    const n = $('#cnote');
-    n.innerHTML = `Your message is ready. <a href="${href}">Open it in your email app</a>, or send it to <strong>${esc(email)}</strong>. <button type="button" class="btn outline" id="cp" style="padding:6px 12px;margin-left:6px">Copy message</button>`;
-    n.classList.add('show');
-    $('#cp').onclick = () => navigator.clipboard.writeText(`To: ${email}\nSubject: ${subject}\n\n${body}`).then(() => $('#cp').textContent = 'Copied').catch(() => {});
+  const endpoint = 'https://formsubmit.co/ajax/' + encodeURIComponent(S.formKey || email);
+  $$('form.enq-form').forEach(form => {
+    const note = $('.note', form), btn = $('button[type=submit]', form), label = btn.textContent;
+    const say = (cls, html) => { note.className = 'note show ' + cls; note.innerHTML = html; };
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(form));
+      if (d._honey) return;                                   // spam bot
+      if (!d.name || !d.email || !d.msg) { say('err', 'Please fill in your name, email and message.'); return; }
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email)) { say('err', 'Please enter a valid email address.'); return; }
+      delete d._honey;
+      const topic = d.topic || d.type || 'General enquiry';
+      const payload = Object.assign({
+        _subject: `Website enquiry: ${topic} | ${d.name}`,
+        _template: 'table', _captcha: 'false', _replyto: d.email,
+        'Sent from': form.dataset.source || 'Website'
+      }, d);
+      btn.disabled = true; btn.textContent = 'Sending…'; say('', 'Sending your message…');
+      try {
+        const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify(payload) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && (j.success === true || j.success === 'true')) {
+          form.reset();
+          say('ok', `<strong>Thank you, ${esc(d.name.split(' ')[0])}.</strong> Your message has been sent. You will receive a reply at ${esc(d.email)}.`);
+          btn.textContent = 'Sent';
+          setTimeout(() => { btn.disabled = false; btn.textContent = label; }, 6000);
+          return;
+        }
+        throw new Error(j.message || 'Not delivered');
+      } catch (err) {
+        const body = Object.entries(d).map(([k, v]) => `${k}: ${v}`).join('\n');
+        const href = `mailto:${email}?subject=${encodeURIComponent('Website enquiry: ' + topic)}&body=${encodeURIComponent(body)}`;
+        say('err', `Sorry, the message could not be sent just now. Please email <a href="${href}">${esc(email)}</a> or WhatsApp +92 323 6521686.`);
+        btn.disabled = false; btn.textContent = label;
+      }
+    });
   });
 })();

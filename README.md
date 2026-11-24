@@ -13,7 +13,8 @@ A free website hosted on GitHub Pages, in the Scholar theme. Everything is edita
 | `img/` | All photos | When you add photos |
 | `assets/css/style.css` | Colours, fonts, layout (colour codes are at the top) | Rarely |
 | `assets/js/main.js` | How the site behaves (tabs, filters, lightbox) | Never |
-| `scholar-widget/` | Optional live Google Scholar box (Part 4) | Once |
+| `.github/workflows/update-scholar.yml` | Daily automatic Google Scholar update (Part 4) | Never |
+| `data/scholar.json` | Latest Scholar numbers, written automatically | Never |
 
 ---
 
@@ -100,28 +101,24 @@ GitHub Pages hosts this design exactly as built. Google Sites cannot host custom
 
 ---
 
-## Part 4 — Live Google Scholar numbers (optional, about 10 minutes)
+## Part 4 — Live Google Scholar numbers (automatic)
 
-This adds a box that refreshes your citations, h-index, i10-index and per-paper citation counts from Google Scholar every day.
+The file `.github/workflows/update-scholar.yml` makes GitHub read your Google Scholar profile every day at about 06:17 (Pakistan time). It saves the results in `data/scholar.json`. The website then shows your latest citations, h-index and i10-index, plus a "Cited by" count on each paper. The Publications tab also gets a "Most cited" filter.
 
-1. Go to **script.google.com** (signed in with your Gmail) → **New project**. Name it "Scholar Box".
-2. Delete what is in `Code.gs` and paste the contents of `scholar-widget/Code.gs`.
-3. Click **+** next to *Files* → **HTML**, name it `Widget`, and paste the contents of `scholar-widget/Widget.html`.
-4. In the toolbar, choose the function **setup** → **Run**. Approve the permissions (choose your account → *Advanced* → *Go to Scholar Box*).
-5. Click **Deploy → New deployment**. Under the gear icon choose **Web app**:
-   - *Execute as:* **Me**
-   - *Who has access:* **Anyone**
-   - Click **Deploy** and copy the **Web app URL**.
-6. On GitHub, open `assets/js/data.js` and paste the URL between the quotes on the line `scholarWidgetUrl: "",`. Commit.
+- **Run it now:** **Actions** tab → **Update Google Scholar data** → **Run workflow**.
+- **Check it:** a green tick means success. `data/scholar.json` appears in the repository and the home page shows "Live from Google Scholar · updated …".
+- **If Google Scholar blocks a day's read:** the run still shows a tick, with a yellow warning. The site keeps the previous numbers.
+- **If the run fails with a red cross mentioning "permission":** go to **Settings → Actions → General → Workflow permissions**, choose **Read and write permissions**, **Save**, and run it again.
+- **Manual fallback:** until the first successful run, the site shows the numbers under `metrics:` in `data.js`.
 
-The home page then shows the live numbers, and the Publications tab shows a live list with citation counts. Google Scholar has no official data feed and sometimes blocks automatic reads. On those days the box keeps the last good numbers.
+## Part 5 — Enquiry forms (Contact and Training tabs)
 
-To switch the live box off, empty the quotes again: `scholarWidgetUrl: "",`.
+Both forms send the enquiry straight to the email set in `data.js` (`email:`), using the free FormSubmit service.
 
----
+- **One-time activation:** send yourself a test message from the website. FormSubmit then emails you an **Activate Form** link; click it, checking your spam folder too. Until you do, visitors see a message asking them to email you directly.
+- **Optional:** after activation, FormSubmit can give you a random code that hides your email address. Add it to `data.js` as `formKey: "the-code",` on a new line under `email:`.
 
 ## Notes
 
-- The contact form opens the visitor's email app, addressed to the email set in `data.js`.
 - Photos are named by event, such as `phdconv.jpg`, `ural.jpg` and `iqraflyer.jpg`. Their captions are in `data.js`.
 - If something breaks after an edit, a missing comma or quote in `data.js` is the usual cause. On GitHub, open the file's **History** to see or restore the previous version.

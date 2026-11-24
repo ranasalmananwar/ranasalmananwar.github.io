@@ -298,6 +298,12 @@ nav.primary a::after{background:var(--accent)}
 .seal .mono{fill:#fff;font-size:34px}
 @media (max-width:900px){.seal{left:auto;right:-10px;width:110px;height:110px;bottom:-30px}}
 
-/* live Google Scholar boxes (shown only when scholarWidgetUrl is set in data.js) */
-.scholar-frame{width:100%;border:0;display:block;background:transparent}
-#scholar-live{display:none}
+
+/* enquiry forms */
+.hp{position:absolute!important;left:-9999px!important;width:1px;height:1px;opacity:0}
+.note.ok{border-left-color:var(--accent-2);background:#eef4f3}
+.note.err{border-left-color:#a33a2c;background:#fbf0ee}
+.fine{font-size:.82rem;color:var(--muted);margin:4px 0 0}
+button[disabled]{opacity:.7;cursor:wait}
+/* Google Scholar citation badge on publications */
+ol.pubs .meta span.cites{background:var(--accent-2);border-color:var(--accent-2);color:#fff}
