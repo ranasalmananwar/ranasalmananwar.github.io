@@ -22,6 +22,8 @@
   function fmtDate(d) { try { return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return d; } }
   async function loadScholar() {
     const host = location.hostname, urls = [];
+    const gas = (S.scholarWidgetUrl || '').trim();          // Google Apps Script address (data.js)
+    if (gas) urls.push(gas);
     if (host.endsWith('.github.io')) urls.push(`https://raw.githubusercontent.com/${host.split('.')[0]}/${host}/main/data/scholar.json`);
     urls.push('data/scholar.json?v=' + Date.now());
     for (const u of urls) {
